@@ -24,6 +24,9 @@ function Invoke-FFmpeg {
         [string] $PassName,            # ex: "Pass 1", "Pass 2", "CRF Pass"
         [Parameter(Mandatory=$true)]
         [string] $CurrentFileName      # Somente para exibir no log
+        
+        [Parameter(Mandatory=$false)]
+        [string] $ErrorLogFile         # Caminho do log de stderr
     )
 
     # Configura o ProcessStartInfo para o ffmpeg
@@ -273,7 +276,7 @@ $gbSettings.Controls.Add($chkVertical)
 # Botão “Converter”
 $btnConvert = New-Object System.Windows.Forms.Button
 $btnConvert.Text     = "▶ Iniciar Conversão"
-$btnConvert.Font     = New-Object System.Drawing.Font("Segoe UI",9,[System.Drawing.FontStyle]::Bold)
+$btnConvert.Font     = New-Object System.Drawing.Font("Segoe UI",9)
 $btnConvert.BackColor= [System.Drawing.Color]::FromArgb(30,144,255)
 $btnConvert.ForeColor= [System.Drawing.Color]::White
 $btnConvert.FlatStyle= "Flat"
@@ -526,7 +529,7 @@ $btnConvert.Add_Click({
         }
 
         # Atualiza progresso
-        $percent = [math]::Floor(($fileCounter / $totalFiles) * 100)
+        $percent = [math]::Floor(($currentIndex / $totalFiles) * 100)
         if ($percent -gt 100) { $percent = 100 }
         if ($percent -lt 0) { $percent = 0 }
         $progressBar.Value = $percent
@@ -537,10 +540,10 @@ $btnConvert.Add_Click({
     # 4.2.7 – Fim do loop de arquivos
     if ($fileCounter -eq 0) {
         $statusLabel.Text = "Nenhum arquivo convertido com sucesso."
-    } elseif ($fileCounter -lt $totalFiles) {
-        $statusLabel.Text = "$fileCounter de $totalFiles arquivos convertidos (alguns falharam)."
+    } elseif ($successCount -lt $totalFiles) {
+        $statusLabel.Text = "$successCount de $totalFiles arquivos convertidos (alguns falharam)."
     } else {
-        $statusLabel.Text = "$fileCounter de $totalFiles arquivos convertidos com sucesso."
+        $statusLabel.Text = "$successCounte de $totalFiles arquivos convertidos com sucesso."
     }
     [System.Windows.Forms.MessageBox]::Show(
         "Processo concluído! Verifique a pasta de saída e os logs em:`n$outputDir",
@@ -557,4 +560,5 @@ $form.Add_FormClosing({
 })
 
 $form.Topmost = $true
+
 [void] $form.ShowDialog()
