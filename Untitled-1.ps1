@@ -15,18 +15,43 @@ Add-Type -AssemblyName System.Drawing
 # 2. Função auxiliar: Invoke-FFmpeg
 # ===========================
 function Invoke-FFmpeg {
+    <#
+    .SYNOPSIS
+    Executa o FFmpeg capturando saída e erros.
+
+    .DESCRIPTION
+    Inicia um processo do FFmpeg com os argumentos fornecidos, armazenando o
+    stderr opcionalmente em um arquivo de log. Caso o código de retorno seja
+    diferente de zero, exibe uma MessageBox com a mensagem de erro.
+
+    .PARAMETER Arguments
+    String contendo todos os argumentos que serão repassados ao FFmpeg.
+
+    .PARAMETER PassName
+    Identifica o passo atual (ex.: "Pass 1", "Pass 2" ou "CRF Pass").
+
+    .PARAMETER CurrentFileName
+    Nome do arquivo em processamento, para referência nos logs.
+
+    .PARAMETER ErrorLogFile
+    Caminho opcional para salvar a saída de erro do FFmpeg.
+
+    .OUTPUTS
+    [bool] Retorna $true em caso de sucesso ou $false em caso de falha.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory=$true)]
         [string] $Arguments,
 
         [Parameter(Mandatory=$true)]
-        [string] $PassName,            # ex: "Pass 1", "Pass 2", "CRF Pass"
+        [string] $PassName,
+
         [Parameter(Mandatory=$true)]
-        [string] $CurrentFileName      # Somente para exibir no log
-        
+        [string] $CurrentFileName,
+
         [Parameter(Mandatory=$false)]
-        [string] $ErrorLogFile         # Caminho do log de stderr
+        [string] $ErrorLogFile
     )
 
     # Configura o ProcessStartInfo para o ffmpeg
@@ -95,6 +120,7 @@ function Invoke-FFmpeg {
     # Se tudo ocorreu bem:
     Write-Host "FFmpeg [$PassName] para [$CurrentFileName] concluído com sucesso."
     return $true
+}
 
 function Validate-Input {
     <#
@@ -358,7 +384,7 @@ $btnConvert.Add_Click({
 
     # 4.2.6 – Laço sobre cada arquivo selecionado
     $totalFiles = $listBox.Items.Count
-    $fileCounter = 0
+    $currentIndex = 0
 
     # Para manter UI responsiva, podemos usar um Job → Exemplo abaixo:
     $listaArquivos = @()
@@ -374,7 +400,7 @@ $btnConvert.Add_Click({
 
     # (A) VERSÃO SIMPLES: Bloqueia a UI, mas mostra progressBar com DoEvents
     foreach ($videoPath in $listaArquivos) {
-        $fileCounter++
+        $currentIndex++
         $baseFileName = [System.IO.Path]::GetFileNameWithoutExtension($videoPath)
         $outputFile    = Join-Path $outputDir "$($baseFileName)_INSTA_H264_ADV.mp4"
         $passLogFile   = Join-Path $logFileDir "$($baseFileName)_passlog"
@@ -425,11 +451,10 @@ $btnConvert.Add_Click({
             )
 
             $argsString = $argList -join " "
-            $sucesso   = Invoke-FFmpeg -Arguments $argsString -PassName "CRF Pass" -CurrentFileName $baseFileName
-            if ($sucesso) { $successCount++ }
-
-            $sucesso = Invoke-FFmpeg -Arguments $argsString -PassName "CRF Pass" -CurrentFileName $baseFileName -ErrorLogFile $crfLogFile
-            if ($sucesso) { $fileCounter++ }
+            $sucesso   = Invoke-FFmpeg -Arguments $argsString -PassName "CRF Pass" -CurrentFileName $baseFileName -ErrorLogFile $crfLogFile
+            if ($sucesso) {
+                $successCount++
+            }
         }
         else {
             # *** 2-Pass (mais “padrão” de qualidade constante) ***
@@ -492,12 +517,11 @@ $btnConvert.Add_Click({
                 "-ac", $AudioChannels,
                 "-y", "`"$outputFile`""
             )
-            $argsPass2     = $pass2 -join " "
-            $sucessoPass2  = Invoke-FFmpeg -Arguments $argsPass2 -PassName "Pass 2" -CurrentFileName $baseFileName
-            if ($sucessoPass2) { $successCount++ }
-
+            $argsPass2 = $pass2 -join " "
             $sucessoPass2 = Invoke-FFmpeg -Arguments $argsPass2 -PassName "Pass 2" -CurrentFileName $baseFileName -ErrorLogFile $pass2LogFile
-            if ($sucessoPass2) { $fileCounter++ }
+            if ($sucessoPass2) {
+                $successCount++
+            }
         }
 
         # Atualiza progresso
@@ -510,12 +534,12 @@ $btnConvert.Add_Click({
     }
 
     # 4.2.7 – Fim do loop de arquivos
-    if ($fileCounter -eq 0) {
+    if ($successCount -eq 0) {
         $statusLabel.Text = "Nenhum arquivo convertido com sucesso."
     } elseif ($successCount -lt $totalFiles) {
         $statusLabel.Text = "$successCount de $totalFiles arquivos convertidos (alguns falharam)."
     } else {
-        $statusLabel.Text = "$successCounte de $totalFiles arquivos convertidos com sucesso."
+        $statusLabel.Text = "$successCount de $totalFiles arquivos convertidos com sucesso."
     }
     [System.Windows.Forms.MessageBox]::Show(
         "Processo concluído! Verifique a pasta de saída e os logs em:`n$outputDir",
