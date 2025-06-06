@@ -18,6 +18,144 @@ function Invoke-FFmpeg {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory=$true)]
+        [string] $Arguments,
+
+        [Parameter(Mandatory=$true)]
+        [string] $PassName,            # ex: "Pass 1", "Pass 2", "CRF Pass"
+        [Parameter(Mandatory=$true)]
+        [string] $CurrentFileName      # Somente para exibir no log
+    )
+
+    # Configura o ProcessStartInfo para o ffmpeg
+    $processInfo = New-Object System.Diagnostics.ProcessStartInfo
+    # Se o ffmpeg não estiver no PATH, defina o caminho absoluto aqui:
+    # Exemplo: $processInfo.FileName = "C:\FFmpeg\bin\ffmpeg.exe"
+    $processInfo.FileName = "ffmpeg"
+    $processInfo.Arguments = $Arguments
+    $processInfo.RedirectStandardError  = $true
+    $processInfo.RedirectStandardOutput = $true
+    $processInfo.UseShellExecute        = $false
+    $processInfo.CreateNoWindow         = $true
+
+    # Coleta a saída de erro padrão (STDERR) de forma assíncrona
+    $stdErrBuilder = [System.Text.StringBuilder]::new()
+    $errorHandler = {
+        param($sender, $e)
+        if ($e.Data) {
+            [void] $stdErrBuilder.AppendLine($e.Data)
+        }
+    }
+
+    $process = New-Object System.Diagnostics.Process
+    $process.StartInfo = $processInfo
+    $process.add_ErrorDataReceived($errorHandler)
+    # Se quiser capturar STDOUT também, faça add_OutputDataReceived similar:
+    # $process.add_OutputDataReceived({ param($sender, $e) if ($e.Data) { ... } })
+
+    try {
+        $process.Start() | Out-Null
+        $process.BeginErrorReadLine()
+        # $process.BeginOutputReadLine()   # ativar se estiver capturando STDOUT
+
+        $process.WaitForExit()
+    }
+    catch {
+        [System.Windows.Forms.MessageBox]::Show(
+            "EXCEÇÃO ao iniciar/monitorar o FFmpeg (`"$PassName`" → `$CurrentFileName`):`n$($_.Exception.Message)",
+            "Erro Crítico ao Chamar FFmpeg",
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Error
+        )
+        return $false
+    }
+
+    # Se o código de saída do FFmpeg for diferente de zero → erro
+    if ($process.ExitCode -ne 0) {
+        $outputErr = $stdErrBuilder.ToString()
+        [System.Windows.Forms.MessageBox]::Show(
+            "FFmpeg retornou código $($process.ExitCode) no passo `"$PassName`" para o arquivo `"$CurrentFileName`".`n`nSaída de erro:`n$outputErr",
+            "Erro na Execução do FFmpeg",
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Error
+        )
+        return $false
+    }
+
+    # Se tudo ocorreu bem:
+    Write-Host "FFmpeg [$PassName] para [$CurrentFileName] concluído com sucesso."
+    return $true
+
+function Validate-Input {
+    <#
+    .SYNOPSIS
+    Valida arquivos e parâmetros antes da conversão.
+
+    .DESCRIPTION
+    Garante que os caminhos selecionados existem, possuem extensões suportadas e
+    que o ffmpeg está disponível no PATH. Opcionalmente valida faixas de CRF ou
+    Bitrate quando informados.
+
+    .PARAMETER Files
+    Lista de arquivos a validar.
+
+    .PARAMETER UseCRF
+    Indica se o modo CRF está ativo.
+
+    .PARAMETER CRFValue
+    Valor CRF a ser verificado (17–22).
+
+    .PARAMETER Bitrate
+    Bitrate para validação no modo two-pass (ex.: 3000k).
+    #>
+    [CmdletBinding()]
+    param(
+        [string[]] $Files,
+        [switch]   $UseCRF,
+        [int]      $CRFValue,
+        [string]   $Bitrate
+    )
+
+    $allowedExt = '.mp4','.mov','.mkv','.avi','.wmv','.flv'
+    foreach ($file in $Files) {
+        if (-not (Test-Path $file)) {
+            Write-Error "Arquivo não encontrado: $file"
+            return $false
+        }
+        $ext = [IO.Path]::GetExtension($file)
+        if ($allowedExt -notcontains $ext.ToLower()) {
+            Write-Error "Extensão não suportada: $file"
+            return $false
+        }
+    }
+
+    if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) {
+        Write-Error "ffmpeg não localizado no PATH"
+        return $false
+    }
+
+    if ($UseCRF) {
+        if ($PSBoundParameters.ContainsKey('CRFValue')) {
+            if ($CRFValue -lt 17 -or $CRFValue -gt 22) {
+                Write-Error "Valor CRF deve estar entre 17 e 22. Recebido: $CRFValue"
+                return $false
+            }
+        }
+    } else {
+        if ($PSBoundParameters.ContainsKey('Bitrate')) {
+            if ($Bitrate -notmatch '^\d+k$') {
+                Write-Error "Bitrate inválido: $Bitrate"
+                return $false
+            }
+        }
+    }
+    return $true
+}
+
+=======
+function Invoke-FFmpeg {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory=$true)]
         [string[]] $ArgumentList,
 
         [Parameter(Mandatory=$true)]
@@ -257,6 +395,14 @@ $btnConvert.Add_Click({
     $listaArquivos = @()
     foreach ($f in $listBox.Items) { $listaArquivos += $f }
 
+    $crfValue = 17
+    $twoPassBitrate = '3000k'
+    $validationOK = Validate-Input -Files $listaArquivos -UseCRF:$chkCRF.Checked -CRFValue $crfValue -Bitrate $twoPassBitrate
+    if (-not $validationOK) {
+        $statusLabel.Text = 'Erro na validação dos arquivos.'
+        return
+    }
+
     # (A) VERSÃO SIMPLES: Bloqueia a UI, mas mostra progressBar com DoEvents
     foreach ($videoPath in $listaArquivos) {
         $fileCounter++
@@ -305,6 +451,10 @@ $btnConvert.Add_Click({
                 "-ac", $AudioChannels,
                 "-y", "`"$outputFile`""
             )
+
+            $argsString = $argList -join " "
+            $sucesso   = Invoke-FFmpeg -Arguments $argsString -PassName "CRF Pass" -CurrentFileName $baseFileName
+            if ($sucesso) { $successCount++ }
 
             $sucesso = Invoke-FFmpeg -ArgumentList $argList -PassName "CRF Pass" -CurrentFileName $baseFileName
             if ($sucesso) { $fileCounter++ }
@@ -367,6 +517,10 @@ $btnConvert.Add_Click({
                 "-ac", $AudioChannels,
                 "-y", "`"$outputFile`""
             )
+            $argsPass2     = $pass2 -join " "
+            $sucessoPass2  = Invoke-FFmpeg -Arguments $argsPass2 -PassName "Pass 2" -CurrentFileName $baseFileName
+            if ($sucessoPass2) { $successCount++ }
+
             $sucessoPass2 = Invoke-FFmpeg -ArgumentList $pass2 -PassName "Pass 2" -CurrentFileName $baseFileName
             if ($sucessoPass2) { $fileCounter++ }
         }
