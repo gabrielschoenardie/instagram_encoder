@@ -18,7 +18,7 @@ function Invoke-FFmpeg {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory=$true)]
-        [string] $Arguments,
+        [string[]] $ArgumentList,
 
         [Parameter(Mandatory=$true)]
         [string] $PassName,            # ex: "Pass 1", "Pass 2", "CRF Pass"
@@ -26,42 +26,13 @@ function Invoke-FFmpeg {
         [string] $CurrentFileName      # Somente para exibir no log
     )
 
-    # Configura o ProcessStartInfo para o ffmpeg
-    $processInfo = New-Object System.Diagnostics.ProcessStartInfo
-    # Se o ffmpeg não estiver no PATH, defina o caminho absoluto aqui:
-    # Exemplo: $processInfo.FileName = "C:\FFmpeg\bin\ffmpeg.exe"
-    $processInfo.FileName = "ffmpeg"
-    $processInfo.Arguments = $Arguments
-    $processInfo.RedirectStandardError  = $true
-    $processInfo.RedirectStandardOutput = $true
-    $processInfo.UseShellExecute        = $false
-    $processInfo.CreateNoWindow         = $true
-
-    # Coleta a saída de erro padrão (STDERR) de forma assíncrona
-    $stdErrBuilder = [System.Text.StringBuilder]::new()
-    $errorHandler = {
-        param($sender, $e)
-        if ($e.Data) {
-            [void] $stdErrBuilder.AppendLine($e.Data)
-        }
-    }
-
-    $process = New-Object System.Diagnostics.Process
-    $process.StartInfo = $processInfo
-    $process.add_ErrorDataReceived($errorHandler)
-    # Se quiser capturar STDOUT também, faça add_OutputDataReceived similar:
-    # $process.add_OutputDataReceived({ param($sender, $e) if ($e.Data) { ... } })
-
+    $errorFile = [System.IO.Path]::GetTempFileName()
     try {
-        $process.Start() | Out-Null
-        $process.BeginErrorReadLine()
-        # $process.BeginOutputReadLine()   # ativar se estiver capturando STDOUT
-
-        $process.WaitForExit()
+        $process = Start-Process -FilePath ffmpeg -ArgumentList $ArgumentList -NoNewWindow -Wait -PassThru -RedirectStandardError $errorFile
     }
     catch {
         [System.Windows.Forms.MessageBox]::Show(
-            "EXCEÇÃO ao iniciar/monitorar o FFmpeg (`"$PassName`" → `$CurrentFileName`):`n$($_.Exception.Message)",
+            "EXCEÇÃO ao iniciar o FFmpeg (`"$PassName`" → `$CurrentFileName`):`n$($_.Exception.Message)",
             "Erro Crítico ao Chamar FFmpeg",
             [System.Windows.Forms.MessageBoxButtons]::OK,
             [System.Windows.Forms.MessageBoxIcon]::Error
@@ -69,9 +40,8 @@ function Invoke-FFmpeg {
         return $false
     }
 
-    # Se o código de saída do FFmpeg for diferente de zero → erro
     if ($process.ExitCode -ne 0) {
-        $outputErr = $stdErrBuilder.ToString()
+        $outputErr = Get-Content -Path $errorFile -Raw
         [System.Windows.Forms.MessageBox]::Show(
             "FFmpeg retornou código $($process.ExitCode) no passo `"$PassName`" para o arquivo `"$CurrentFileName`".`n`nSaída de erro:`n$outputErr",
             "Erro na Execução do FFmpeg",
@@ -81,7 +51,6 @@ function Invoke-FFmpeg {
         return $false
     }
 
-    # Se tudo ocorreu bem:
     Write-Host "FFmpeg [$PassName] para [$CurrentFileName] concluído com sucesso."
     return $true
 }
@@ -337,8 +306,7 @@ $btnConvert.Add_Click({
                 "-y", "`"$outputFile`""
             )
 
-            $argsString = $argList -join " "
-            $sucesso = Invoke-FFmpeg -Arguments $argsString -PassName "CRF Pass" -CurrentFileName $baseFileName
+            $sucesso = Invoke-FFmpeg -ArgumentList $argList -PassName "CRF Pass" -CurrentFileName $baseFileName
             if ($sucesso) { $fileCounter++ }
         }
         else {
@@ -368,8 +336,7 @@ $btnConvert.Add_Click({
                 "-an",
                 "-f", "null", "NUL"
             )
-            $argsPass1 = $pass1 -join " "
-            $sucessoPass1 = Invoke-FFmpeg -Arguments $argsPass1 -PassName "Pass 1" -CurrentFileName $baseFileName
+            $sucessoPass1 = Invoke-FFmpeg -ArgumentList $pass1 -PassName "Pass 1" -CurrentFileName $baseFileName
             if (-not $sucessoPass1) { continue }
 
             # Pass 2
@@ -400,8 +367,7 @@ $btnConvert.Add_Click({
                 "-ac", $AudioChannels,
                 "-y", "`"$outputFile`""
             )
-            $argsPass2 = $pass2 -join " "
-            $sucessoPass2 = Invoke-FFmpeg -Arguments $argsPass2 -PassName "Pass 2" -CurrentFileName $baseFileName
+            $sucessoPass2 = Invoke-FFmpeg -ArgumentList $pass2 -PassName "Pass 2" -CurrentFileName $baseFileName
             if ($sucessoPass2) { $fileCounter++ }
         }
 
