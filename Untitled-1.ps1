@@ -84,7 +84,73 @@ function Invoke-FFmpeg {
     # Se tudo ocorreu bem:
     Write-Host "FFmpeg [$PassName] para [$CurrentFileName] concluído com sucesso."
     return $true
+
+function Validate-Input {
+    <#
+    .SYNOPSIS
+    Valida arquivos e parâmetros antes da conversão.
+
+    .DESCRIPTION
+    Garante que os caminhos selecionados existem, possuem extensões suportadas e
+    que o ffmpeg está disponível no PATH. Opcionalmente valida faixas de CRF ou
+    Bitrate quando informados.
+
+    .PARAMETER Files
+    Lista de arquivos a validar.
+
+    .PARAMETER UseCRF
+    Indica se o modo CRF está ativo.
+
+    .PARAMETER CRFValue
+    Valor CRF a ser verificado (17–22).
+
+    .PARAMETER Bitrate
+    Bitrate para validação no modo two-pass (ex.: 3000k).
+    #>
+    [CmdletBinding()]
+    param(
+        [string[]] $Files,
+        [switch]   $UseCRF,
+        [int]      $CRFValue,
+        [string]   $Bitrate
+    )
+
+    $allowedExt = '.mp4','.mov','.mkv','.avi','.wmv','.flv'
+    foreach ($file in $Files) {
+        if (-not (Test-Path $file)) {
+            Write-Error "Arquivo não encontrado: $file"
+            return $false
+        }
+        $ext = [IO.Path]::GetExtension($file)
+        if ($allowedExt -notcontains $ext.ToLower()) {
+            Write-Error "Extensão não suportada: $file"
+            return $false
+        }
+    }
+
+    if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) {
+        Write-Error "ffmpeg não localizado no PATH"
+        return $false
+    }
+
+    if ($UseCRF) {
+        if ($PSBoundParameters.ContainsKey('CRFValue')) {
+            if ($CRFValue -lt 17 -or $CRFValue -gt 22) {
+                Write-Error "Valor CRF deve estar entre 17 e 22. Recebido: $CRFValue"
+                return $false
+            }
+        }
+    } else {
+        if ($PSBoundParameters.ContainsKey('Bitrate')) {
+            if ($Bitrate -notmatch '^\d+k$') {
+                Write-Error "Bitrate inválido: $Bitrate"
+                return $false
+            }
+        }
+    }
+    return $true
 }
+
 
 # =====================
 # 3. Construção do formulário (UI)
@@ -287,6 +353,15 @@ $btnConvert.Add_Click({
     # Para manter UI responsiva, podemos usar um Job → Exemplo abaixo:
     $listaArquivos = @()
     foreach ($f in $listBox.Items) { $listaArquivos += $f }
+
+    $crfValue = 17
+    $twoPassBitrate = '3000k'
+    $validationOK = Validate-Input -Files $listaArquivos -UseCRF:$chkCRF.Checked -CRFValue $crfValue -Bitrate $twoPassBitrate
+    if (-not $validationOK) {
+        $statusLabel.Text = 'Erro na validação dos arquivos.'
+        return
+    }
+
 
     # (A) VERSÃO SIMPLES: Bloqueia a UI, mas mostra progressBar com DoEvents
     foreach ($videoPath in $listaArquivos) {
