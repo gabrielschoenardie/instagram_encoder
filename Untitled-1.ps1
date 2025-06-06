@@ -281,8 +281,9 @@ $btnConvert.Add_Click({
     $AudioChannels      = 2
 
     # 4.2.6 – Laço sobre cada arquivo selecionado
-    $totalFiles = $listBox.Items.Count
-    $fileCounter = 0
+    $totalFiles    = $listBox.Items.Count
+    $currentIndex  = 0
+    $successCount  = 0
 
     # Para manter UI responsiva, podemos usar um Job → Exemplo abaixo:
     $listaArquivos = @()
@@ -290,7 +291,7 @@ $btnConvert.Add_Click({
 
     # (A) VERSÃO SIMPLES: Bloqueia a UI, mas mostra progressBar com DoEvents
     foreach ($videoPath in $listaArquivos) {
-        $fileCounter++
+        $currentIndex++
         $baseFileName = [System.IO.Path]::GetFileNameWithoutExtension($videoPath)
         $outputFile   = Join-Path $outputDir "$($baseFileName)_INSTA_H264_ADV.mp4"
         $passLogFile  = Join-Path $logFileDir "$($baseFileName)_passlog"
@@ -338,8 +339,8 @@ $btnConvert.Add_Click({
             )
 
             $argsString = $argList -join " "
-            $sucesso = Invoke-FFmpeg -Arguments $argsString -PassName "CRF Pass" -CurrentFileName $baseFileName
-            if ($sucesso) { $fileCounter++ }
+            $sucesso   = Invoke-FFmpeg -Arguments $argsString -PassName "CRF Pass" -CurrentFileName $baseFileName
+            if ($sucesso) { $successCount++ }
         }
         else {
             # *** 2-Pass (mais “padrão” de qualidade constante) ***
@@ -400,13 +401,13 @@ $btnConvert.Add_Click({
                 "-ac", $AudioChannels,
                 "-y", "`"$outputFile`""
             )
-            $argsPass2 = $pass2 -join " "
-            $sucessoPass2 = Invoke-FFmpeg -Arguments $argsPass2 -PassName "Pass 2" -CurrentFileName $baseFileName
-            if ($sucessoPass2) { $fileCounter++ }
+            $argsPass2     = $pass2 -join " "
+            $sucessoPass2  = Invoke-FFmpeg -Arguments $argsPass2 -PassName "Pass 2" -CurrentFileName $baseFileName
+            if ($sucessoPass2) { $successCount++ }
         }
 
         # Atualiza progresso
-        $percent = [math]::Floor(($fileCounter / $totalFiles) * 100)
+        $percent = [math]::Floor(($currentIndex / $totalFiles) * 100)
         if ($percent -gt 100) { $percent = 100 }
         if ($percent -lt 0) { $percent = 0 }
         $progressBar.Value = $percent
@@ -415,12 +416,12 @@ $btnConvert.Add_Click({
     }
 
     # 4.2.7 – Fim do loop de arquivos
-    if ($fileCounter -eq 0) {
+    if ($successCount -eq 0) {
         $statusLabel.Text = "Nenhum arquivo convertido com sucesso."
-    } elseif ($fileCounter -lt $totalFiles) {
-        $statusLabel.Text = "$fileCounter de $totalFiles arquivos convertidos (alguns falharam)."
+    } elseif ($successCount -lt $totalFiles) {
+        $statusLabel.Text = "$successCount de $totalFiles arquivos convertidos (alguns falharam)."
     } else {
-        $statusLabel.Text = "$fileCounter de $totalFiles arquivos convertidos com sucesso."
+        $statusLabel.Text = "$successCount de $totalFiles arquivos convertidos com sucesso."
     }
     [System.Windows.Forms.MessageBox]::Show(
         "Processo concluído! Verifique a pasta de saída e os logs em:`n$outputDir",
