@@ -1,6 +1,6 @@
 <!-- Badges -->
-![PowerShell Gallery](https://img.shields.io/powershellgallery/dt/InstagramEncoder?color=orange)  
-![GitHub Actions](https://img.shields.io/github/actions/workflow/status/gabrielschoenardie/instagram_encoder/ci.yml?branch=main)  
+![FFmpeg](https://img.shields.io/badge/FFmpeg-H.264-green?logo=ffmpeg)
+![Instagram Ready](https://img.shields.io/badge/Instagram-Ready-purple)
 ![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)  
 
 ---
