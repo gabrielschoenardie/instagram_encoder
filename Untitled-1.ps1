@@ -72,6 +72,14 @@ function Invoke-FFmpeg {
         return $false
     }
 
+    if ($ErrorLogFile) {
+        try {
+            $stdErrBuilder.ToString() | Out-File -FilePath $ErrorLogFile -Encoding UTF8 -Force
+        } catch {
+            Write-Warning "Falha ao salvar log de erro em: $ErrorLogFile"
+        }
+    }
+
     # Se o código de saída do FFmpeg for diferente de zero → erro
     if ($process.ExitCode -ne 0) {
         $outputErr = $stdErrBuilder.ToString()
@@ -151,48 +159,6 @@ function Validate-Input {
             }
         }
     }
-    return $true
-}
-
-=======
-function Invoke-FFmpeg {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory=$true)]
-        [string[]] $ArgumentList,
-
-        [Parameter(Mandatory=$true)]
-        [string] $PassName,            # ex: "Pass 1", "Pass 2", "CRF Pass"
-        [Parameter(Mandatory=$true)]
-        [string] $CurrentFileName      # Somente para exibir no log
-    )
-
-    $errorFile = [System.IO.Path]::GetTempFileName()
-    try {
-        $process = Start-Process -FilePath ffmpeg -ArgumentList $ArgumentList -NoNewWindow -Wait -PassThru -RedirectStandardError $errorFile
-    }
-    catch {
-        [System.Windows.Forms.MessageBox]::Show(
-            "EXCEÇÃO ao iniciar o FFmpeg (`"$PassName`" → `$CurrentFileName`):`n$($_.Exception.Message)",
-            "Erro Crítico ao Chamar FFmpeg",
-            [System.Windows.Forms.MessageBoxButtons]::OK,
-            [System.Windows.Forms.MessageBoxIcon]::Error
-        )
-        return $false
-    }
-
-    if ($process.ExitCode -ne 0) {
-        $outputErr = Get-Content -Path $errorFile -Raw
-        [System.Windows.Forms.MessageBox]::Show(
-            "FFmpeg retornou código $($process.ExitCode) no passo `"$PassName`" para o arquivo `"$CurrentFileName`".`n`nSaída de erro:`n$outputErr",
-            "Erro na Execução do FFmpeg",
-            [System.Windows.Forms.MessageBoxButtons]::OK,
-            [System.Windows.Forms.MessageBoxIcon]::Error
-        )
-        return $false
-    }
-
-    Write-Host "FFmpeg [$PassName] para [$CurrentFileName] concluído com sucesso."
     return $true
 }
 
@@ -410,8 +376,11 @@ $btnConvert.Add_Click({
     foreach ($videoPath in $listaArquivos) {
         $fileCounter++
         $baseFileName = [System.IO.Path]::GetFileNameWithoutExtension($videoPath)
-        $outputFile   = Join-Path $outputDir "$($baseFileName)_INSTA_H264_ADV.mp4"
-        $passLogFile  = Join-Path $logFileDir "$($baseFileName)_passlog"
+        $outputFile    = Join-Path $outputDir "$($baseFileName)_INSTA_H264_ADV.mp4"
+        $passLogFile   = Join-Path $logFileDir "$($baseFileName)_passlog"
+        $crfLogFile    = Join-Path $logFileDir "$($baseFileName)_crf.log"
+        $pass1LogFile  = Join-Path $logFileDir "$($baseFileName)_pass1.log"
+        $pass2LogFile  = Join-Path $logFileDir "$($baseFileName)_pass2.log"
 
         # Montar filtro de video (vertical vs horizontal)
         if ($chkVertical.Checked) {
@@ -459,7 +428,7 @@ $btnConvert.Add_Click({
             $sucesso   = Invoke-FFmpeg -Arguments $argsString -PassName "CRF Pass" -CurrentFileName $baseFileName
             if ($sucesso) { $successCount++ }
 
-            $sucesso = Invoke-FFmpeg -ArgumentList $argList -PassName "CRF Pass" -CurrentFileName $baseFileName
+            $sucesso = Invoke-FFmpeg -Arguments $argsString -PassName "CRF Pass" -CurrentFileName $baseFileName -ErrorLogFile $crfLogFile
             if ($sucesso) { $fileCounter++ }
         }
         else {
@@ -484,12 +453,14 @@ $btnConvert.Add_Click({
                 "-keyint_min", $keyintMinValue,
                 "-sc_threshold", $scThresholdValue,
                 "-vf", "`"$VideoFilter`"",
-                "-x264-params", "`"$x264FineTuneParams`"",
+                   "-x264-params", "`"$x264FineTuneParams`"",
                 "-pass", "1",
+                "-passlogfile", "`"$passLogFile`"",
                 "-an",
                 "-f", "null", "NUL"
             )
-            $sucessoPass1 = Invoke-FFmpeg -ArgumentList $pass1 -PassName "Pass 1" -CurrentFileName $baseFileName
+            $argsPass1 = $pass1 -join " "
+            $sucessoPass1 = Invoke-FFmpeg -Arguments $argsPass1 -PassName "Pass 1" -CurrentFileName $baseFileName -ErrorLogFile $pass1LogFile
             if (-not $sucessoPass1) { continue }
 
             # Pass 2
@@ -514,6 +485,7 @@ $btnConvert.Add_Click({
                 "-vf", "`"$VideoFilter`"",
                 "-x264-params", "`"$x264FineTuneParams`"",
                 "-pass", "2",
+                "-passlogfile", "`"$passLogFile`"",
                 "-c:a", $AudioCodec,
                 "-b:a", $AudioBitrate,
                 "-ar", $AudioSampleRate,
@@ -524,7 +496,7 @@ $btnConvert.Add_Click({
             $sucessoPass2  = Invoke-FFmpeg -Arguments $argsPass2 -PassName "Pass 2" -CurrentFileName $baseFileName
             if ($sucessoPass2) { $successCount++ }
 
-            $sucessoPass2 = Invoke-FFmpeg -ArgumentList $pass2 -PassName "Pass 2" -CurrentFileName $baseFileName
+            $sucessoPass2 = Invoke-FFmpeg -Arguments $argsPass2 -PassName "Pass 2" -CurrentFileName $baseFileName -ErrorLogFile $pass2LogFile
             if ($sucessoPass2) { $fileCounter++ }
         }
 
