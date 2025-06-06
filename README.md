@@ -1,44 +1,60 @@
-
-# Instagram Encoder
-
-![License](https://img.shields.io/badge/license-MIT-blue)
-![PSVersion](https://img.shields.io/badge/PSVersion-5.1%2C7.0+-brightgreen)
-![Build Status](https://github.com/gabrielschoenardie/instagram_encoder/actions/workflows/ci.yml/badge.svg)
-
-**Conversor gráfico em PowerShell para gerar vídeos otimizados para Instagram (Reels 9:16, H.264, CRF 17, barra de progresso, etc.)**
+<!-- Badges -->
+![PowerShell Gallery](https://img.shields.io/powershellgallery/dt/InstagramEncoder?color=orange)  
+![GitHub Actions](https://img.shields.io/github/actions/workflow/status/gabrielschoenardie/instagram_encoder/ci.yml?branch=main)  
+![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)  
 
 ---
 
-## 📌 Sobre
+# 🎬 Instagram Encoder
 
-O **Instagram Encoder** foi criado para simplificar o workflow de criadores de conteúdo que precisam converter vídeos em lote para o formato padrão de **Reels** no Instagram.  
-Ele oferece:
-
-- **Interface Windows Forms** totalmente em PowerShell, com design limpo e responsivo.  
-- **Suporte a CRF (Qualidade Constante)** ou **2-pass (Controle de Bitrate)**.  
-- **Corte automático** para vídeos com até 59 segundos (padrão Instagram).  
-- **Filtro de escala inteligente** (vertical 9:16 ou horizontal 16:9) com `lanczos` e `format=yuv420p`.  
-- **Áudio AAC 48 kHz, estéreo** (2 canais).  
-- **Logging automático** em pasta `ffmpeg_logs` para cada arquivo convertido.  
-
-Este projeto é ideal para quem deseja uma solução “tudo em um” para converter vídeos com qualidade cinematográfica para Instagram, sem depender de programas externos ou interfaces pesadas.
+> **"Do seu computador direto para as telas do mundo inteiro."**  
+> Uma jornada cinematográfica em cada frame, trazendo vídeos comuns ao auge da perfeição otimizada para Instagram.
 
 ---
 
-## 🚀 Começando
+## 🌟 Visão Geral
 
-### 🔧 Pré-requisitos
+No auge da indústria cinematográfica, cada detalhe importa: cores, proporções, qualidade. Assim como um diretor exige excelência em cada cena, o **Instagram Encoder** eleva seus vídeos à experiência de cinema — agora no seu Instagram Reels, Stories ou Feed. Desenvolvido em PowerShell, este projeto encapsula a força do FFmpeg, a elegância do PSScriptAnalyzer e a robustez de testes Pester para oferecer um pipeline de conversão de vídeo digno de Hollywood.
 
-1. **Windows 10/11 (64-bit)** com PowerShell **5.1+** ou **PowerShell 7+** instalado.  
-2. **FFmpeg** instalado e disponível no `PATH` do sistema.  
-   - Recomenda-se baixar a versão estável mais recente em [ffmpeg.org](https://ffmpeg.org/).  
-3. **Permissões** para criar pastas e arquivos no diretório onde o script será executado.  
-4. **Codificação UTF-8 sem BOM** no arquivo principal (`InstagramEncoder.ps1`).  
-   - Veja [Como salvar em UTF-8 sem BOM](#como-salvar-em-utf-8-sem-bom).
+---
 
-### 📥 Instalação
+## 🎥 Recursos Principais
 
-1. Abra um terminal PowerShell e clone este repositório:
+- **Conversão Cinematográfica**  
+  - Ajuste automático de resolução para padrões verticais 9:16 (Reels/Stories) e horizontais 16:9 (Feed).
+  - Dois modos de codificação:
+    - **CRF**: qualidade constante, garantindo brilho máximo em cada cena.
+    - **Two-Pass**: precisão de bitrate, para máxima fidelidade em momentos decisivos.
+- **Validação Avançada de Entradas**  
+  - Verifica existência do arquivo e formatos suportados (`.mp4`, `.mov`, `.mkv`, `.avi`).
+  - Checa rigorosamente proporções e faixas de CRF (17–22) ou Bitrate (`\d+k`).
+- **Tratamento de Erros de Estreia**  
+  - Captura e grava cada mensagem de erro do FFmpeg.
+  - Mensagens salas de cinema: diálogos claros e instrutivos para o usuário em caso de falha.
+- **Testes de Qualidade (Pester)**  
+  - Cenários de unidade cobrindo desde arquivos inexistentes até conversões bem-sucedidas.
+  - Garante que cada take (frame) do processo seja aprovado antes do release.
+- **Lint & Estilo (PSScriptAnalyzer)**  
+  - Padrões de nomenclatura e chamadas recomendadas (sem `Write-Host`, só verbos aprovados).
+  - Formatação impecável, como roteiros de grandes produções.
+- **Integração Contínua (GitHub Actions)**  
+  - Pipeline automatizado para rodar lint, testes Pester e checar consistência dos prompts/AGENTS.md.
+  - Garante que cada commit seja uma cena pronta para estrear no palco principal (branch `main`).
+
+---
+
+## 📦 Requisitos
+
+Antes da grande produção, assegure-se de ter em mãos:
+
+1. **Windows PowerShell 5.1+** ou **PowerShell 7+**  
+   - Execute `pwsh --version` para confirmar.
+2. **FFmpeg**  
+   - Disponível no `PATH` do sistema.  
+   - Para instalar rapidamente no Windows:  
+     ```powershell
+     winget install -e --id Gyan.FFmpeg
+     ```
+3. **PSScriptAnalyzer** (para lint automático)  
    ```powershell
-   git clone https://github.com/gabrielschoenardie/instagram_encoder.git
-   cd instagram_encoder
+   Install-Module -Name PSScriptAnalyzer -Scope CurrentUser
