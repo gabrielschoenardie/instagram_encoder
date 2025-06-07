@@ -58,3 +58,35 @@ Antes da grande produção, assegure-se de ter em mãos:
 3. **PSScriptAnalyzer** (para lint automático)  
    ```powershell
    Install-Module -Name PSScriptAnalyzer -Scope CurrentUser
+
+4. **Installation**
+```powershell
+git clone https://github.com/gabrielschoenardie/instagram_encoder
+cd instagram_encoder
+Import-Module .\src\InstagramEncoder.psd1
+```
+**Usage**
+```powershell
+Start-InstagramEncoder
+```
+
+## Features
+
+- Advanced H.264 encoding optimized for Instagram
+- Modern GUI with progress tracking
+- Async processing support
+- Comprehensive error handling
+- Detailed logging
+
+## Project Structure
+```
+src/      # Source code & module
+docs/     # Documentation
+tests/    # Unit tests
+build/    # Build artifacts
+logs/     # Runtime logs
+.vscode/  # VS Code workspace config
+```
+
+## License
+See [LICENSE](https://github.com/gabrielschoenardie/instagram_encoder/LICENSE)
