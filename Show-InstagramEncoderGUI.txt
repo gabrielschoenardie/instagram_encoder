@@ -1,0 +1,266 @@
+function Show-InstagramEncoderGUI {
+    [CmdletBinding()]
+    param()
+
+    Add-Type -AssemblyName System.Windows.Forms
+    Add-Type -AssemblyName System.Drawing
+
+    # Create the main form
+    $form = New-Object System.Windows.Forms.Form
+    $form.Text = "Instagram Encoder"
+    $form.Size = New-Object System.Drawing.Size(600, 500)
+    $form.StartPosition = "CenterScreen"
+    $form.FormBorderStyle = "FixedDialog"
+    $form.MaximizeBox = $false
+
+    # Create a label for file selection
+    $labelFile = New-Object System.Windows.Forms.Label
+    $labelFile.Location = New-Object System.Drawing.Point(20, 20)
+    $labelFile.Size = New-Object System.Drawing.Size(100, 20)
+    $labelFile.Text = "Input Video:"
+    $form.Controls.Add($labelFile)
+
+    # Create a textbox for file path
+    $textBoxFile = New-Object System.Windows.Forms.TextBox
+    $textBoxFile.Location = New-Object System.Drawing.Point(130, 20)
+    $textBoxFile.Size = New-Object System.Drawing.Size(350, 20)
+    $form.Controls.Add($textBoxFile)
+
+    # Create a button for file browsing
+    $buttonBrowse = New-Object System.Windows.Forms.Button
+    $buttonBrowse.Location = New-Object System.Drawing.Point(490, 20)
+    $buttonBrowse.Size = New-Object System.Drawing.Size(80, 23)
+    $buttonBrowse.Text = "Browse..."
+    $buttonBrowse.Add_Click({
+        $openFileDialog = New-Object System.Windows.Forms.OpenFileDialog
+        $openFileDialog.Filter = "Video files (*.mp4;*.mov;*.mkv;*.avi)|*.mp4;*.mov;*.mkv;*.avi|All files (*.*)|*.*"
+        $openFileDialog.Title = "Select a video file"
+        if ($openFileDialog.ShowDialog() -eq "OK") {
+            $textBoxFile.Text = $openFileDialog.FileName
+        }
+    })
+    $form.Controls.Add($buttonBrowse)
+
+    # Create a group box for Resolution
+    $groupBoxResolution = New-Object System.Windows.Forms.GroupBox
+    $groupBoxResolution.Location = New-Object System.Drawing.Point(20, 60)
+    $groupBoxResolution.Size = New-Object System.Drawing.Size(550, 70)
+    $groupBoxResolution.Text = "Resolution"
+    $form.Controls.Add($groupBoxResolution)
+
+    # Create radio buttons for resolution
+    $radioVertical = New-Object System.Windows.Forms.RadioButton
+    $radioVertical.Location = New-Object System.Drawing.Point(20, 30)
+    $radioVertical.Size = New-Object System.Drawing.Size(250, 20)
+    $radioVertical.Text = "Vertical (1080x1920) - Reels/Stories"
+    $radioVertical.Checked = $true
+    $groupBoxResolution.Controls.Add($radioVertical)
+
+    $radioHorizontal = New-Object System.Windows.Forms.RadioButton
+    $radioHorizontal.Location = New-Object System.Drawing.Point(280, 30)
+    $radioHorizontal.Size = New-Object System.Drawing.Size(250, 20)
+    $radioHorizontal.Text = "Horizontal (1920x1080) - Feed"
+    $groupBoxResolution.Controls.Add($radioHorizontal)
+
+    # Create a group box for Encoding Mode
+    $groupBoxEncoding = New-Object System.Windows.Forms.GroupBox
+    $groupBoxEncoding.Location = New-Object System.Drawing.Point(20, 150)
+    $groupBoxEncoding.Size = New-Object System.Drawing.Size(550, 150)
+    $groupBoxEncoding.Text = "Encoding Mode"
+    $form.Controls.Add($groupBoxEncoding)
+
+    # Create radio buttons for encoding mode
+    $radioCRF = New-Object System.Windows.Forms.RadioButton
+    $radioCRF.Location = New-Object System.Drawing.Point(20, 30)
+    $radioCRF.Size = New-Object System.Drawing.Size(500, 20)
+    $radioCRF.Text = "CRF (Constant Rate Factor) - Quality-based encoding"
+    $radioCRF.Checked = $true
+    $radioCRF.Add_CheckedChanged({
+        $numericCRF.Enabled = $radioCRF.Checked
+        $textBoxBitrate.Enabled = -not $radioCRF.Checked
+    })
+    $groupBoxEncoding.Controls.Add($radioCRF)
+
+    # Create a label and numeric up-down for CRF value
+    $labelCRF = New-Object System.Windows.Forms.Label
+    $labelCRF.Location = New-Object System.Drawing.Point(40, 60)
+    $labelCRF.Size = New-Object System.Drawing.Size(80, 20)
+    $labelCRF.Text = "CRF Value:"
+    $groupBoxEncoding.Controls.Add($labelCRF)
+
+    $numericCRF = New-Object System.Windows.Forms.NumericUpDown
+    $numericCRF.Location = New-Object System.Drawing.Point(130, 60)
+    $numericCRF.Size = New-Object System.Drawing.Size(60, 20)
+    $numericCRF.Minimum = 17
+    $numericCRF.Maximum = 22
+    $numericCRF.Value = 18
+    $groupBoxEncoding.Controls.Add($numericCRF)
+
+    $labelCRFInfo = New-Object System.Windows.Forms.Label
+    $labelCRFInfo.Location = New-Object System.Drawing.Point(200, 60)
+    $labelCRFInfo.Size = New-Object System.Drawing.Size(320, 20)
+    $labelCRFInfo.Text = "(17-22, lower = higher quality, larger file)"
+    $groupBoxEncoding.Controls.Add($labelCRFInfo)
+
+    # Create radio button for Two-Pass encoding
+    $radioTwoPass = New-Object System.Windows.Forms.RadioButton
+    $radioTwoPass.Location = New-Object System.Drawing.Point(20, 90)
+    $radioTwoPass.Size = New-Object System.Drawing.Size(500, 20)
+    $radioTwoPass.Text = "Two-Pass - Bitrate-based encoding"
+    $radioTwoPass.Add_CheckedChanged({
+        $textBoxBitrate.Enabled = $radioTwoPass.Checked
+        $numericCRF.Enabled = -not $radioTwoPass.Checked
+    })
+    $groupBoxEncoding.Controls.Add($radioTwoPass)
+
+    # Create a label and textbox for bitrate
+    $labelBitrate = New-Object System.Windows.Forms.Label
+    $labelBitrate.Location = New-Object System.Drawing.Point(40, 120)
+    $labelBitrate.Size = New-Object System.Drawing.Size(80, 20)
+    $labelBitrate.Text = "Bitrate:"
+    $groupBoxEncoding.Controls.Add($labelBitrate)
+
+    $textBoxBitrate = New-Object System.Windows.Forms.TextBox
+    $textBoxBitrate.Location = New-Object System.Drawing.Point(130, 120)
+    $textBoxBitrate.Size = New-Object System.Drawing.Size(60, 20)
+    $textBoxBitrate.Text = "3000k"
+    $textBoxBitrate.Enabled = $false
+    $groupBoxEncoding.Controls.Add($textBoxBitrate)
+
+    $labelBitrateInfo = New-Object System.Windows.Forms.Label
+    $labelBitrateInfo.Location = New-Object System.Drawing.Point(200, 120)
+    $labelBitrateInfo.Size = New-Object System.Drawing.Size(320, 20)
+    $labelBitrateInfo.Text = "(Format: 3000k, 6000k, etc.)"
+    $groupBoxEncoding.Controls.Add($labelBitrateInfo)
+
+    # Create a label for output directory
+    $labelOutput = New-Object System.Windows.Forms.Label
+    $labelOutput.Location = New-Object System.Drawing.Point(20, 320)
+    $labelOutput.Size = New-Object System.Drawing.Size(100, 20)
+    $labelOutput.Text = "Output Folder:"
+    $form.Controls.Add($labelOutput)
+
+    # Create a textbox for output directory
+    $textBoxOutput = New-Object System.Windows.Forms.TextBox
+    $textBoxOutput.Location = New-Object System.Drawing.Point(130, 320)
+    $textBoxOutput.Size = New-Object System.Drawing.Size(350, 20)
+    $textBoxOutput.Text = "convertidos_h264_instagram_avancado"
+    $form.Controls.Add($textBoxOutput)
+
+    # Create a button for output directory browsing
+    $buttonOutputBrowse = New-Object System.Windows.Forms.Button
+    $buttonOutputBrowse.Location = New-Object System.Drawing.Point(490, 320)
+    $buttonOutputBrowse.Size = New-Object System.Drawing.Size(80, 23)
+    $buttonOutputBrowse.Text = "Browse..."
+    $buttonOutputBrowse.Add_Click({
+        $folderBrowserDialog = New-Object System.Windows.Forms.FolderBrowserDialog
+        $folderBrowserDialog.Description = "Select output folder"
+        if ($folderBrowserDialog.ShowDialog() -eq "OK") {
+            $textBoxOutput.Text = $folderBrowserDialog.SelectedPath
+        }
+    })
+    $form.Controls.Add($buttonOutputBrowse)
+
+    # Create a progress bar
+    $progressBar = New-Object System.Windows.Forms.ProgressBar
+    $progressBar.Location = New-Object System.Drawing.Point(20, 360)
+    $progressBar.Size = New-Object System.Drawing.Size(550, 23)
+    $progressBar.Style = "Marquee"
+    $progressBar.MarqueeAnimationSpeed = 0
+    $form.Controls.Add($progressBar)
+
+    # Create a status label
+    $statusLabel = New-Object System.Windows.Forms.Label
+    $statusLabel.Location = New-Object System.Drawing.Point(20, 390)
+    $statusLabel.Size = New-Object System.Drawing.Size(550, 20)
+    $statusLabel.Text = "Ready"
+    $form.Controls.Add($statusLabel)
+
+    # Create encode button
+    $buttonEncode = New-Object System.Windows.Forms.Button
+    $buttonEncode.Location = New-Object System.Drawing.Point(240, 420)
+    $buttonEncode.Size = New-Object System.Drawing.Size(120, 30)
+    $buttonEncode.Text = "Start Encoding"
+    $buttonEncode.Add_Click({
+        # Validate input
+        if ([string]::IsNullOrEmpty($textBoxFile.Text)) {
+            [System.Windows.Forms.MessageBox]::Show("Please select an input video file.", "Input Required", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning)
+            return
+        }
+
+        if (-not (Test-Path -LiteralPath $textBoxFile.Text -PathType Leaf)) {
+            [System.Windows.Forms.MessageBox]::Show("The selected input file does not exist.", "File Not Found", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+            return
+        }
+
+        # Get parameters from form
+        $inputPath = $textBoxFile.Text
+        $resolution = if ($radioVertical.Checked) { "1080x1920" } else { "1920x1080" }
+        $encodingMode = if ($radioCRF.Checked) { "CRF" } else { "Two-Pass" }
+        $outputDirectory = $textBoxOutput.Text
+
+        # Start encoding in background job
+        $statusLabel.Text = "Encoding in progress..."
+        $progressBar.MarqueeAnimationSpeed = 30
+        $buttonEncode.Enabled = $false
+
+        $scriptBlock = {
+            param($inputPath, $resolution, $encodingMode, $crfValue, $bitrate, $outputDirectory)
+            $params = @{
+                InputPath = $inputPath
+                Resolution = $resolution
+                EncodingMode = $encodingMode
+                OutputDirectory = $outputDirectory
+            }
+
+            if ($encodingMode -eq 'CRF') {
+                $params.Add('CRFValue', $crfValue)
+            } else {
+                $params.Add('Bitrate', $bitrate)
+            }
+
+            Start-InstagramEncoder @params -Verbose
+        }
+
+        $job = Start-Job -ScriptBlock $scriptBlock -ArgumentList $inputPath, $resolution, $encodingMode, $numericCRF.Value, $textBoxBitrate.Text, $outputDirectory
+
+        # Timer to check job status
+        $timer = New-Object System.Windows.Forms.Timer
+        $timer.Interval = 1000
+        $timer.Add_Tick({
+            if ($job.State -eq "Completed") {
+                $timer.Stop()
+                $progressBar.MarqueeAnimationSpeed = 0
+                $jobResult = Receive-Job -Job $job
+                
+                if ($jobResult -eq $true) {
+                    $statusLabel.Text = "Encoding completed successfully!"
+                    [System.Windows.Forms.MessageBox]::Show("Video encoding completed successfully!", "Success", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
+                } else {
+                    $statusLabel.Text = "Encoding failed. Check logs for details."
+                    [System.Windows.Forms.MessageBox]::Show("Video encoding failed. Please check the logs in the output directory for details.", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+                }
+                
+                Remove-Job -Job $job
+                $buttonEncode.Enabled = $true
+            }
+            elseif ($job.State -eq "Failed") {
+                $timer.Stop()
+                $progressBar.MarqueeAnimationSpeed = 0
+                $statusLabel.Text = "Encoding job failed!"
+                
+                $error = Receive-Job -Job $job
+                [System.Windows.Forms.MessageBox]::Show("Error: $error", "Job Failed", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+                
+                Remove-Job -Job $job
+                $buttonEncode.Enabled = $true
+            }
+        })
+        $timer.Start()
+    })
+    $form.Controls.Add($buttonEncode)
+
+    # Show the form
+    $form.Add_Shown({$form.Activate()})
+    [void]$form.ShowDialog()
+}
