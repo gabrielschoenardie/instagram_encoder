@@ -1,0 +1,19 @@
+# Import the module
+Import-Module ..\src\InstagramEncoder.psd1
+
+# Example 1: Convert a video for Instagram Reels with CRF mode
+Start-InstagramEncoder -InputPath "C:\Videos\my_video.mp4" `
+                       -Resolution "1080x1920" `
+                       -EncodingMode "CRF" `
+                       -CRFValue 18 `
+                       -Verbose
+
+# Example 2: Convert a video for Instagram Feed with Two-Pass mode
+Start-InstagramEncoder -InputPath "C:\Videos\my_video.mp4" `
+                       -Resolution "1920x1080" `
+                       -EncodingMode "Two-Pass" `
+                       -Bitrate "3000k" `
+                       -Verbose
+
+# Example 3: Launch the GUI
+Show-InstagramEncoderGUI
